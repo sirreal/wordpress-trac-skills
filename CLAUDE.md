@@ -1,58 +1,76 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with
+code in this repository.
 
 ## Project Overview
 
-Claude Code plugin marketplace repository. Contains plugins published under the `sirreal` marketplace namespace.
+Claude Code plugin marketplace repository. Plugins are published under the
+`sirreal` marketplace namespace.
 
 **Marketplace install:**
-```
+
+```text
 /plugin marketplace add sirreal/agent-skills
 /plugin install wordpress-trac@sirreal
 ```
 
 ## Repository Structure
 
-```
+```text
 .claude-plugin/
-├── marketplace.json    # Marketplace config (namespace, owner, plugin list)
-└── plugin.json         # Marketplace-level metadata
+└── marketplace.json        # Marketplace metadata and plugin list
 plugins/
-└── wordpress-trac/     # Individual plugin
-    ├── .claude-plugin/plugin.json  # Plugin manifest
-    └── skills/         # One directory per skill (SKILL.md + scripts/)
+├── wordpress-trac/
+│   ├── .mcp.json           # Plugin-shipped Trac MCP server
+│   ├── README.md
+│   └── skills/
+│       └── wp-trac-fix/    # Defect reproduction workflow and references
+└── phptools-lsp/
 ```
+
+There is no marketplace-level or plugin-level `plugin.json` in this
+repository. Plugin metadata and versions live in
+`.claude-plugin/marketplace.json`.
 
 ## Development
 
-**Requirements:** PHP 8.4+ with curl extension (uses native `Dom\HTMLDocument`, no Composer dependencies)
+Validate the marketplace from the repository root:
 
-**Test scripts directly:**
 ```bash
-./plugins/wordpress-trac/skills/wp-trac-ticket/scripts/ticket.php 62345
-./plugins/wordpress-trac/skills/wp-trac-changeset/scripts/changeset.php 59734
-./plugins/wordpress-trac/skills/wp-trac-search/scripts/search.php "status=new component=Editor"
-./plugins/wordpress-trac/skills/wp-trac-timeline/scripts/timeline.php --author=jonsurrell --daysback=14
+claude plugin validate .
 ```
 
-**Test plugin locally:**
+Load the WordPress Trac plugin directly:
+
 ```bash
 claude --plugin-dir ./plugins/wordpress-trac
 ```
 
+MCP configuration changes are not picked up live. Run `/reload-plugins` in the
+Claude Code session or restart it after changing `.mcp.json`. Confirm the
+`wp-trac` approval prompt appears, `/mcp` lists the server, the
+`mcp__plugin_wordpress-trac_wp-trac__*` tools resolve, and `/wp-trac-fix` is
+the only slash command supplied by this plugin.
+
 ## Plugin Patterns
 
-**Skills** use YAML frontmatter with `allowed-tools` restricting Bash to specific scripts via `${CLAUDE_PLUGIN_ROOT}`:
-```yaml
----
-allowed-tools:
-  - Bash(${CLAUDE_PLUGIN_ROOT}/skills/wp-trac-ticket/scripts/ticket.php:*)
----
+Remote MCP servers are declared in `.mcp.json` at the plugin root:
+
+```json
+{
+  "mcpServers": {
+    "wp-trac": {
+      "type": "http",
+      "url": "https://wordpress-trac-mcp-server-prod.a8c-aiops.workers.dev/mcp"
+    }
+  }
+}
 ```
 
-**Scripts** fetch from `core.trac.wordpress.org` using:
-- TSV API (`?format=tab`) for structured ticket data
-- HTML parsing with `Dom\HTMLDocument` for changesets/comments
-- RSS API (`/timeline?format=rss`) for activity feeds
-- Trac wiki → markdown conversion for descriptions
+Plugin-shipped servers use Claude Code's per-server approval flow. Do not also
+declare the same server inline in a plugin manifest.
+
+Skills use YAML frontmatter for routing metadata. `wp-trac-fix` is an
+instruction-only workflow with no `allowed-tools` entry and no bundled
+scripts. Keep references relative to its skill directory.
