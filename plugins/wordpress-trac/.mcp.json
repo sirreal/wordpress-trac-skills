@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "wp-trac": {
+      "type": "http",
+      "url": "https://wordpress-trac-mcp-server-prod.a8c-aiops.workers.dev/mcp"
+    }
+  }
+}
