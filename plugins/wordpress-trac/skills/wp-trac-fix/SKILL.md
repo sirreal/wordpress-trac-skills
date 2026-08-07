@@ -40,7 +40,7 @@ envlite init runs `npm ci`, `npm run build:dev`, and `composer install` — minu
 
 ## Phase A — Read the ticket
 
-Fetch the ticket via the `wp-trac-ticket` skill. The default mode returns everything you need — description, attachments, changesets, comments, and any linked pull requests — in a single call.
+Fetch the ticket with the `getTicket` MCP tool, passing the ticket number as `id`, `includeComments: true`, and `commentLimit: 50`. The response includes the description, attachments, changesets, comments, and linked pull requests. If `metadata.linkedPullRequestsUnavailable` is true, fetch `https://api.wordpress.org/dotorg/trac/pr/?trac=core&ticket=<id>` directly, record the MCP enrichment failure in the final report's `notes` field, and do not treat an empty MCP pull-request list as evidence that none exist. If `metadata.returnedComments` is less than `metadata.totalComments`, record in `notes` that the discussion was truncated at 50 comments.
 
 Read critically — the entire ticket, not only the comments. Descriptions, sample code, and commenter conclusions are all unreliable; they may be wrong, stale, or written without ever being run. Conversely, comments that *look* dismissable (a patch that didn't apply, a confused author) often contain load-bearing environment details. Read every comment for its evidence, separately from its conclusion.
 
