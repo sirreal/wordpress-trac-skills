@@ -1,6 +1,10 @@
 # WordPress Trac Plugin
 
-A Claude Code plugin for working with WordPress Trac.
+A Claude Code plugin that connects to an Automattic-operated WordPress Trac
+MCP server and provides a workflow for reproducing WordPress core defects.
+
+The MCP tools need no Trac login, browser cookie, DevTools setup, local PHP
+runtime, or curl extension. There is no session cookie to expire.
 
 ## Installation
 
@@ -9,148 +13,67 @@ claude plugin marketplace add sirreal/agent-skills
 claude plugin install wordpress-trac@sirreal
 ```
 
-## Prerequisites
+## MCP server
 
-- PHP 8.4+ (required for `Dom\HTMLDocument`)
-- curl extension enabled
+The plugin connects to
+`wordpress-trac-mcp-server-prod.a8c-aiops.workers.dev`. This is an
+Automattic-operated service, not a WordPress.org service.
 
-## Authentication
+Claude Code asks you to approve the `wp-trac` MCP server before connecting on
+first load. MCP configuration is not reloaded live; after installing or
+updating the plugin, run `/reload-plugins` or restart Claude Code.
 
-Trac filters some unauthenticated requests, so the skills need your browser
-session cookie. The easiest way to set this up is to run the **`/wp-trac-auth`**
-skill, which walks you through it interactively, saves the cookie securely, and
-verifies it works. When any other skill hits an auth-required error, it defers
-to `/wp-trac-auth` and re-runs your command once you're logged in.
+The server provides these tools:
 
-You can also set the cookie up manually. Save the raw `Cookie:` request header
-to `~/.config/wp-trac/cookie`:
+| Tool | Purpose |
+|---|---|
+| `getTicket` | Read ticket metadata, description, comments, attachments, changesets, and linked GitHub pull requests. |
+| `getChangeset` | Read a changeset and, optionally, its diff. |
+| `searchTickets` | Search by text, component, milestone, status, or resolution. |
+| `getTimeline` | Read recent site-wide Trac activity. |
+| `getTracInfo` | List components, milestones, priorities, severities, ticket types, or statuses. |
 
-1. Log in to <https://core.trac.wordpress.org/> in your browser.
-2. Open devtools → Network → click any request to `core.trac.wordpress.org`.
-3. Copy the value of the `Cookie:` request header (typically includes
-   `trac_auth`, `trac_form_token`, and a session cookie).
-4. Save it to the cookie file with restrictive permissions:
+Ask naturally; the MCP tools do not add slash commands:
 
-   ```sh
-   mkdir -p ~/.config/wp-trac
-   umask 077 && cat > ~/.config/wp-trac/cookie  # paste, then Ctrl-D
-   ```
-
-The path honors `$XDG_CONFIG_HOME` (so `$XDG_CONFIG_HOME/wp-trac/cookie` if
-set), and `$TRAC_COOKIE_FILE` overrides the location entirely. If the file is
-missing or empty, scripts run anonymously. Cookies expire with the browser
-session — re-run `/wp-trac-auth` (or re-paste) when requests start failing.
-
-## Demo
-
-```
-Tell me about trac ticket 30,000
+```text
+Tell me about Trac #30000
+What changed in WordPress changeset 41062?
+Find accepted HTML API tickets
+Show WordPress Trac activity from the last seven days
 ```
 
-> Ticket #30000 is a joke/commemorative ticket from the WordPress 4.1 milestone era. It references the "Alot" meme from Hyperbole and a Half (a comic about the common misspelling of "a lot") with an image attachment.
->
-> The ticket is closed and was filed under the WordPress.org Site component. It's essentially a playful marker celebrating the project reaching 30,000 tickets, similar to how projects sometimes note round-number milestones. The reference to #30005 and Mike Nolan suggests there was some coordination around these milestone ticket numbers.
+### Current query limits
 
-## Skills
+`searchTickets` supports `query`, `component`, `milestone`, `status`,
+`resolution`, `limit`, and `page`, with at most 50 results per page. It does
+not accept negated filters such as `status!=closed`. To search all open
+tickets, query each open status separately: `new`, `assigned`, `accepted`,
+`reopened`, and `reviewing`.
 
-### `/wp-trac-auth`
+`getChangeset` returns at most 10,000 characters of diff content per call.
 
-Set up or refresh WordPress Trac authentication. Checks your current cookie and,
-when it's missing or expired, walks you through copying the `Cookie:` request
-header from a logged-in browser session, saves it securely, and verifies it
-works. The other skills defer to this one automatically when a request fails
-with an auth-required error.
+`getTimeline` currently returns only recent site-wide activity: at most 30 days
+and 100 events. It has no author filter, historical end date, or pagination,
+so contributor-specific results may be incomplete and older ranges cannot be
+queried yet.
 
-```
-/wp-trac-auth
-```
+`getTicket` returns at most 50 comments. The `/wp-trac-fix` workflow requests
+that maximum explicitly and reports when a longer discussion was truncated.
 
-### `/wp-trac-ticket <ticket-number>`
+## `/wp-trac-fix <ticket-number>`
 
-Look up a WordPress Trac ticket by number or URL.
+The plugin's only slash command reproduces and attempts a fix for a WordPress
+core defect in an isolated worktree. It walks through setup, ticket reading,
+reproduction, a fix under a roughly 100-line cap, and a structured outcome
+report.
 
-```
-/wp-trac-ticket 30000
-/wp-trac-ticket #30000
-/wp-trac-ticket https://core.trac.wordpress.org/ticket/30000
-```
+Additional prerequisites for `/wp-trac-fix`:
 
-The default output surfaces everything visible on the ticket page: all
-metadata fields, the description, attachments, related changesets, the full
-comment discussion, and any linked GitHub pull requests. For a quick
-metadata-only view (no comments/attachments/changesets/PRs), use `--short`:
-
-```
-/wp-trac-ticket --short 30000
-```
-
-### `/wp-trac-changeset <changeset-number>`
-
-Look up a WordPress Trac changeset by number.
-
-```
-/wp-trac-changeset 41062
-/wp-trac-changeset r27195
-/wp-trac-changeset [26851]
-```
-
-### `/wp-trac-search <description>`
-
-Search WordPress Trac tickets using natural language or specific filters.
-
-```
-/wp-trac-search open HTML API tickets
-/wp-trac-search closed REST API bugs
-/wp-trac-search tickets about block editor
-```
-
-The search command supports various filters:
-- `--component` - Filter by component (e.g., "HTML API", "REST API")
-- `--status` - Filter by status (new, assigned, accepted, closed, reopened, reviewing)
-- `--type` - Filter by type (defect, enhancement, feature request, task)
-- `--milestone` - Filter by milestone
-- `--summary` / `--description` - Text search
-
-Run the script with `--help` for full documentation:
-
-```bash
-./scripts/search.php --help
-```
-
-### `/wp-trac-timeline <time period and/or author>`
-
-Browse WordPress Trac timeline activity. Useful for seeing what you or others have worked on.
-
-```
-/wp-trac-timeline my activity last 2 weeks
-/wp-trac-timeline what did saxmatt work on in January 2005
-/wp-trac-timeline all trac activity yesterday
-```
-
-The timeline command supports:
-- `--from=YYYY-MM-DD` - End date (default: today)
-- `--daysback=N` - Days to look back (1-90, default: 30)
-- `--author=USER` - Filter by author (repeat for multiple)
-
-Run the script with `--help` for full documentation:
-
-```bash
-./scripts/timeline.php --help
-```
-
-### `/wp-trac-fix <ticket-number>`
-
-Reproduce and attempt a fix for a WordPress core defect from Trac in an
-isolated worktree. Walks through setup, ticket reading, reproduction,
-fixing under a ~100-line cap, and producing a structured outcome report.
-
-**Additional prerequisites (only for `/wp-trac-fix`):**
-
-- A `WordPress/wordpress-develop` clone with an `upstream` remote
-  pointing at `WordPress/wordpress-develop`.
+- A `WordPress/wordpress-develop` clone with an `upstream` remote pointing at
+  `WordPress/wordpress-develop`.
 - `envlite` available on `$PATH`.
 
-```
+```text
 /wp-trac-fix 62345
 ```
 

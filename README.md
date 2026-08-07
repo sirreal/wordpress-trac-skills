@@ -13,9 +13,12 @@ claude plugin install wordpress-trac@sirreal
 
 ### [wordpress-trac](./plugins/wordpress-trac/)
 
-Tools for working with WordPress Trac tickets, changesets, searches, and timeline activity.
+An Automattic-operated WordPress Trac MCP server, plus a workflow for
+reproducing and fixing WordPress core defects.
 
-**Prerequisites:** PHP 8.4+, curl extension
+The MCP tools require no Trac cookie or local PHP runtime. The optional
+`/wp-trac-fix` workflow requires a `WordPress/wordpress-develop` clone and
+`envlite`.
 
 ## License
 

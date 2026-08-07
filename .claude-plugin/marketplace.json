@@ -11,10 +11,10 @@
     {
       "source": "./plugins/wordpress-trac",
       "name": "wordpress-trac",
-      "version": "4.2.0",
-      "description": "Tools for working with WordPress Trac",
+      "version": "5.0.0",
+      "description": "WordPress Trac MCP server, plus a core defect reproduction workflow",
       "license": "GPL-2.0-or-later",
-      "keywords": ["WordPress", "Trac", "Changeset", "ticket", "core"]
+      "keywords": ["WordPress", "Trac", "MCP", "core"]
     },
     {
       "source": "./plugins/phptools-lsp",
